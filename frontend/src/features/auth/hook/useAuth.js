@@ -1,6 +1,6 @@
 import { useDispatch } from "react-redux";
-import { register, login, getMe } from "../service/auth.api";
-import { setUser, setLoading, setError } from "../auth.slice";
+import { register, login, getMe,logout as logoutApi  } from "../service/auth.api";
+import { setUser, setLoading, setError, logout  } from "../auth.slice";
 
 
 export function useAuth() {
@@ -34,22 +34,50 @@ async function handleLogin({ email, password }) {
 }
 
 
+// async function handleGetMe() {
+//     try{
+//         dispatch(setLoading(true));
+//         const data = await getMe();
+//         dispatch(setUser(data.user));
+//     } catch(error) {
+//         dispatch(setError(error.response?.data?.message || "Get me failed"));
+//     } finally {
+//         dispatch(setLoading(false));
+//     }
+// }
 async function handleGetMe() {
-    try{
-        dispatch(setLoading(true));
-        const data = await getMe();
-        dispatch(setUser(data.user));
-    } catch(error) {
-        dispatch(setError(error.response?.data?.message || "Get me failed"));
-    } finally {
-        dispatch(setLoading(false));
-    }
-}
+  try {
+    dispatch(setLoading(true));
 
+    const data = await getMe();
+
+    dispatch(setUser(data.user));
+
+  } catch (error) {
+    dispatch(setUser(null));
+  } finally {
+    dispatch(setLoading(false));
+  }
+}
+async function handleLogout() {
+  try {
+    dispatch(setLoading(true));
+
+    await logoutApi();
+
+    dispatch(logout());
+
+  } catch (error) {
+    dispatch(setError(error.response?.data?.message || "Logout failed"));
+  } finally {
+    dispatch(setLoading(false));
+  }
+}
 return{
     handleRegister,
     handleLogin,
-    handleGetMe,    
+    handleGetMe,  
+    handleLogout  
 }
 
 

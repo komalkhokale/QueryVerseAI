@@ -1,23 +1,24 @@
 import { Link, useNavigate } from "react-router-dom";
 import { Menu, User, LayoutDashboard, LogOut } from "lucide-react";
 import { motion } from "framer-motion";
-import { useSelector, useDispatch } from "react-redux";
+
 import { useState } from "react";
-import { logout } from "../../auth/auth.slice" // <-- apne authSlice ka path
+import { useSelector } from "react-redux";
+import { useAuth } from "../../auth/hook/useAuth"
 
 export default function Navbar() {
   const user = useSelector((state) => state.auth.user);
 
-  const dispatch = useDispatch();
-
-  const navigate = useNavigate();
+ const auth = useAuth();
+ const navigate = useNavigate();
 
   const [open, setOpen] = useState(false);
 
-  const handleLogout = () => {
-    dispatch(logout());
-    navigate("/");
-  };
+ const handleLogout = async () => {
+   await auth.handleLogout();
+   navigate("/", { replace: true });
+ };
+
   return (
     <motion.nav
       initial={{ y: -80 }}
@@ -29,7 +30,7 @@ export default function Navbar() {
         <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl px-6 py-4 flex items-center justify-between">
           {/* Logo */}
           <Link to="/" className="text-2xl font-bold tracking-tight text-white">
-            AI<span className="text-violet-500">Verse</span>
+            QueryVerse<span className="text-violet-500">AI</span>
           </Link>
 
           {/* Desktop Menu */}
@@ -87,7 +88,7 @@ export default function Navbar() {
                   onClick={() => setOpen(!open)}
                   className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-semibold"
                 >
-                  {user?.name?.charAt(0)?.toUpperCase() || "U"}
+                  {user?.username?.charAt(0)?.toUpperCase() || "U"}
                 </button>
 
                 {open && (

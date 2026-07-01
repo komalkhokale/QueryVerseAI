@@ -7,7 +7,8 @@ import { el } from "zod/v4/locales";
 
 const geminiModel = new ChatGoogleGenerativeAI({
 //   model: "gemini-2.5-flash-lite",
-  model: "gemini-flash-latest",
+//   model: "gemini-flash-latest",
+model: "gemini-2.0-flash",
   apiKey: process.env.GEMINI_API_KEY,
 });
 
@@ -57,6 +58,28 @@ export async function generateResponse(messages) {
 
     return response.messages[ response.messages.length - 1 ].text;
 
+}
+
+export async function analyzeImage(imageBase64, prompt = "Describe this image.") {
+
+    const response = await geminiModel.invoke([
+        new HumanMessage({
+            content: [
+                {
+                    type: "text",
+                    text: prompt,
+                },
+                {
+                    type: "image_url",
+                    image_url: {
+                        url: imageBase64,
+                    },
+                },
+            ],
+        }),
+    ]);
+
+    return response.text;
 }
 
 export async function  generateChatTitle(message) {

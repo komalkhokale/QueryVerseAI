@@ -5,10 +5,19 @@ const api = axios.create({
     withCredentials: true
 })
 
-export const sendMessage = async ({message, chatId}) => {
-    const response = await api.post("/api/chats/message", {message, chat:chatId})
-    return response.data
-}
+// export const sendMessage = async ({message, chatId}) => {
+//     const response = await api.post("/api/chats/message", {message, chat:chatId})
+//     return response.data
+// }
+
+export const sendMessage = async ({ message, chatId }) => {
+  const response = await api.post("/api/chats/message", {
+    message,
+    chat: chatId,
+  });
+
+  return response.data;
+};
 
 export const getChats = async () => {
     const response = await api.get("/api/chats")
@@ -24,3 +33,11 @@ export const deleteChat = async (chatId) => {
     const response = await api.delete(`/api/chats/delete/${chatId}`)
     return response
 }
+
+export const createChat = async (message) => {
+    const response = await api.post("/api/chats/create-chat", {
+        message,
+    });
+
+    return response.data;
+};
