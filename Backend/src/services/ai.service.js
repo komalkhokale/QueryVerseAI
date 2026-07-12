@@ -1,102 +1,262 @@
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import {HumanMessage, SystemMessage, AIMessage,createAgent, tool} from "langchain"
-import {ChatMistralAI, MistralAI} from "@langchain/mistralai"
-import * as z from "zod"
-import { searchInternet } from "./internet.service.js";
-import { el } from "zod/v4/locales";
+import {
+  HumanMessage,
+  SystemMessage,
+  AIMessage,
+  createAgent,
+  tool,
+} from "langchain";
+import { ChatMistralAI } from "@langchain/mistralai";
+import * as z from "zod";
 
-const geminiModel = new ChatGoogleGenerativeAI({
-//   model: "gemini-2.5-flash-lite",
-//   model: "gemini-flash-latest",
-model: "gemini-2.0-flash",
-  apiKey: process.env.GEMINI_API_KEY,
+import { searchInternet } from "./internet.service.js";
+
+const GEMINI_MODELS = [
+  "gemini-2.5-flash-lite",
+  "gemini-flash-latest",
+  "gemini-2.0-flash",
+];
+
+const mistralModel = new ChatMistralAI({
+  model: "mistral-small-latest",
+  apiKey: process.env.MISTRAL_API_KEY,
 });
 
-const minstralModel = new ChatMistralAI({
-    model: "mistral-small-latest",
-    apiKey: process.env.MISTRAL_API_KEY
-})
+const searchInternetTool = tool(searchInternet, {
+  name: "searchInternet",
+  description:
+    "Use this tool when the user asks for current, latest, recent, or real-time information from the internet.",
+  schema: z.object({
+    query: z
+      .string()
+      .min(1)
+      .describe("The search query to look up on the internet."),
+  }),
+});
 
+const mistralAgent = createAgent({
+  model: mistralModel,
+  tools: [searchInternetTool],
+  systemPrompt: `
+    You are a helpful, accurate, and concise AI assistant.
 
-const searchInternetTool = tool(
-    searchInternet,
-    {
-        name: "searchInternet",
-        description: "Use this tool to get the latest information from the internet.",
-        schema: z.object({
-            query: z.string().describe("The search query to look up on the internet.")
-        })
+    Follow these rules:
+    - Answer clearly and directly.
+    - If you do not know the answer, say that you do not know.
+    - For current, recent, latest, live, or time-sensitive information,
+      use the searchInternet tool before answering.
+    - Base current-information answers on the search results.
+    - Do not invent facts or sources.
+  `,
+});
+
+function convertMessages(messages = []) {
+  return messages
+    .map((message) => {
+      if (!message?.content) {
+        return null;
+      }
+
+      if (message.role === "user") {
+        return new HumanMessage(message.content);
+      }
+
+      if (message.role === "ai" || message.role === "assistant") {
+        return new AIMessage(message.content);
+      }
+
+      if (message.role === "system") {
+        return new SystemMessage(message.content);
+      }
+
+      return null;
+    })
+    .filter(Boolean);
+}
+
+function getErrorStatus(error) {
+  return (
+    error?.status ||
+    error?.response?.status ||
+    error?.cause?.status ||
+    error?.code
+  );
+}
+
+function shouldTryNextModel(error) {
+  const status = getErrorStatus(error);
+
+  return (
+    status === 404 ||
+    status === 429 ||
+    status === 500 ||
+    status === 502 ||
+    status === 503 ||
+    status === 504 ||
+    String(error?.message || "").toLowerCase().includes("quota") ||
+    String(error?.message || "").toLowerCase().includes("rate limit") ||
+    String(error?.message || "").toLowerCase().includes("not found") ||
+    String(error?.message || "").toLowerCase().includes("unavailable")
+  );
+}
+
+async function invokeGeminiWithFallback(messages) {
+  let lastError = null;
+
+  for (const modelName of GEMINI_MODELS) {
+    try {
+      const model = new ChatGoogleGenerativeAI({
+        model: modelName,
+        apiKey: process.env.GEMINI_API_KEY,
+        temperature: 0.4,
+        maxRetries: 1,
+      });
+
+      const response = await model.invoke(messages);
+
+      return {
+        response,
+        modelName,
+      };
+    } catch (error) {
+      lastError = error;
+
+      console.error(
+        `Gemini model ${modelName} failed:`,
+        error?.message || error,
+      );
+
+      if (!shouldTryNextModel(error)) {
+        throw error;
+      }
     }
-)
+  }
 
-const agent = createAgent({
-    model: minstralModel,
-    tools: [ searchInternetTool ],
-})
-
+  throw lastError || new Error("All Gemini models failed");
+}
 
 export async function generateResponse(messages) {
-    console.log(messages)
+  const convertedMessages = convertMessages(messages);
 
-    const response = await agent.invoke({
-        messages: [
-            new SystemMessage(`
-                You are a helpful and precise assistant for answering questions.
-                If you don't know the answer, say you don't know. 
-                If the question requires up-to-date information, use the "searchInternet" tool to get the latest information from the internet and then answer based on the search results.
-            `),
-            ...(messages.map(msg => {
-                if (msg.role == "user") {
-                    return new HumanMessage(msg.content)
-                } else if (msg.role == "ai") {
-                    return new AIMessage(msg.content)
-                }
-            })) ]
+  if (convertedMessages.length === 0) {
+    throw new Error("At least one valid message is required");
+  }
 
-       
+  try {
+    const response = await mistralAgent.invoke({
+      messages: convertedMessages,
     });
 
-    return response.messages[ response.messages.length - 1 ].text;
+    const lastMessage = response.messages?.at(-1);
 
+    if (!lastMessage) {
+      throw new Error("Mistral returned an empty response");
+    }
+
+    return lastMessage.text || lastMessage.content;
+  } catch (mistralError) {
+    console.error(
+      "Mistral agent failed. Trying Gemini fallback:",
+      mistralError?.message || mistralError,
+    );
+
+    const geminiMessages = [
+      new SystemMessage(`
+        You are a helpful, accurate, and concise AI assistant.
+
+        Answer clearly and directly.
+        If you do not know something, say so.
+        Do not invent current information because internet search is not
+        available in this fallback response.
+      `),
+      ...convertedMessages,
+    ];
+
+    const { response } = await invokeGeminiWithFallback(geminiMessages);
+
+    return response.text || response.content;
+  }
 }
 
-export async function analyzeImage(imageBase64, prompt = "Describe this image.") {
+export async function analyzeImage(
+  imageBase64,
+  prompt = "Describe this image.",
+) {
+  if (!imageBase64) {
+    throw new Error("Image is required");
+  }
 
-    const response = await geminiModel.invoke([
-        new HumanMessage({
-            content: [
-                {
-                    type: "text",
-                    text: prompt,
-                },
-                {
-                    type: "image_url",
-                    image_url: {
-                        url: imageBase64,
-                    },
-                },
-            ],
-        }),
+  const imageMessage = new HumanMessage({
+    content: [
+      {
+        type: "text",
+        text: prompt,
+      },
+      {
+        type: "image_url",
+        image_url: {
+          url: imageBase64,
+        },
+      },
+    ],
+  });
+
+  const { response } = await invokeGeminiWithFallback([imageMessage]);
+
+  return response.text || response.content;
+}
+
+export async function generateChatTitle(message) {
+  if (!message?.trim()) {
+    return "New Chat";
+  }
+
+  try {
+    const response = await mistralModel.invoke([
+      new SystemMessage(`
+        Generate only a short conversation title.
+
+        Rules:
+        - Use 2 to 4 words.
+        - Do not answer the user's question.
+        - Do not use quotation marks.
+        - Do not add punctuation at the end.
+        - Return only the title.
+      `),
+      new HumanMessage(message.trim()),
     ]);
 
-    return response.text;
-}
+    const title = String(response.text || response.content || "")
+      .replace(/^["']|["']$/g, "")
+      .trim();
 
-export async function  generateChatTitle(message) {
-    const response = await minstralModel.invoke([
-        new SystemMessage(`You are a helpful, intelligent, and professional AI assistant.
-            
-           User will provide you with the first message of a chat conversation.
-Your task is to generate a relevant and natural AI response.
-Capture the essence in 2–4 words as a short conversation title.
-Keep the response friendly, clear, and context-aware.
-            `),
+    return title || "New Chat";
+  } catch (mistralError) {
+    console.error(
+      "Mistral title generation failed. Trying Gemini:",
+      mistralError?.message || mistralError,
+    );
 
-            new HumanMessage(`
-                Generate a title for a chat conversation based on the following first message:
-                "${message}"
-                `)
-    ])
+    try {
+      const { response } = await invokeGeminiWithFallback([
+        new SystemMessage(`
+          Generate only a short conversation title.
 
-    return response.text;
+          Rules:
+          - Use 2 to 4 words.
+          - Do not answer the question.
+          - Return only the title.
+        `),
+        new HumanMessage(message.trim()),
+      ]);
+
+      return (
+        String(response.text || response.content || "")
+          .replace(/^["']|["']$/g, "")
+          .trim() || "New Chat"
+      );
+    } catch {
+      return message.trim().split(/\s+/).slice(0, 4).join(" ") || "New Chat";
+    }
+  }
 }
