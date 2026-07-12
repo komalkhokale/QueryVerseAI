@@ -28,22 +28,19 @@ export function useAuth() {
         password,
       });
 
-      
-      if (data?.user) {
-        dispatch(setUser(data.user));
-      }
 
-      
+      dispatch(setUser(null));
+
       return data;
     } catch (error) {
       const message =
         error?.response?.data?.message ||
+        error?.response?.data?.errors?.[0]?.msg ||
         error?.message ||
         "Registration failed";
 
       dispatch(setError(message));
 
-      
       throw error;
     } finally {
       dispatch(setLoading(false));
@@ -60,19 +57,20 @@ export function useAuth() {
         password,
       });
 
-      dispatch(setUser(data.user));
+      if (data?.user) {
+        dispatch(setUser(data.user));
+      }
 
-   
       return data;
     } catch (error) {
       const message =
         error?.response?.data?.message ||
+        error?.response?.data?.errors?.[0]?.msg ||
         error?.message ||
         "Login failed";
 
       dispatch(setError(message));
 
-     
       throw error;
     } finally {
       dispatch(setLoading(false));
@@ -82,13 +80,19 @@ export function useAuth() {
   async function handleGetMe() {
     try {
       dispatch(setLoading(true));
+      dispatch(setError(null));
 
       const data = await getMe();
 
-      dispatch(setUser(data.user));
+      if (data?.user) {
+        dispatch(setUser(data.user));
+      } else {
+        dispatch(setUser(null));
+      }
 
       return data;
     } catch (error) {
+
       dispatch(setUser(null));
 
       return null;

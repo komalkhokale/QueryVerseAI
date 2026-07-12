@@ -37,9 +37,6 @@ const Register = () => {
   const user = useSelector((state) => state.auth.user);
   const loading = useSelector((state) => state.auth.loading);
 
-  if (!loading && user) {
-    return <Navigate to="/dashboard" replace />;
-  }
 
   const validateField = (name, value) => {
     const trimmedValue = value.trim();
@@ -151,9 +148,13 @@ const Register = () => {
       setForm(initialForm);
       setErrors(initialErrors);
 
-      navigate("/login", {
-        replace: true,
-      });
+     navigate("/login", {
+       replace: true,
+       state: {
+         message: "Account created. Please check your email and then login.",
+         email: form.email.trim().toLowerCase(),
+       },
+     });
     } catch (error) {
       toast.dismiss(loadingToast);
 
@@ -161,7 +162,7 @@ const Register = () => {
 
       console.log("Register error:", responseData || error);
 
-      // Backend express-validator field errors
+
       if (
         Array.isArray(responseData?.errors) &&
         responseData.errors.length > 0
