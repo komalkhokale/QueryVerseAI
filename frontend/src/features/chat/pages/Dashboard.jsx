@@ -147,7 +147,10 @@ if (selectedImage) {
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 shadow-lg shadow-violet-600/20">
               <Sparkles className="h-4.5 w-4.5 text-white" />
             </div>
-            <h1 className="text-xl font-semibold tracking-tight text-white">
+            <h1
+              onClick={() => navigate("/")}
+              className="text-xl font-semibold tracking-tight text-white cursor-pointer select-none hover:opacity-80 transition-opacity"
+            >
               QueryVerseAI
             </h1>
           </div>
