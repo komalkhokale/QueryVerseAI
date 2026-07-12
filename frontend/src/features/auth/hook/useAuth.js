@@ -28,12 +28,12 @@ export function useAuth() {
         password,
       });
 
-      // Register ke baad backend user return karta hai to ye useful hai
+      
       if (data?.user) {
         dispatch(setUser(data.user));
       }
 
-      // Register page ko success message dene ke liye
+      
       return data;
     } catch (error) {
       const message =
@@ -43,7 +43,7 @@ export function useAuth() {
 
       dispatch(setError(message));
 
-      // Important: page ke catch tak error pahunchana
+      
       throw error;
     } finally {
       dispatch(setLoading(false));
@@ -62,7 +62,7 @@ export function useAuth() {
 
       dispatch(setUser(data.user));
 
-      // Login page ko response aur message dene ke liye
+   
       return data;
     } catch (error) {
       const message =
@@ -72,7 +72,7 @@ export function useAuth() {
 
       dispatch(setError(message));
 
-      // Iske bina failed login ke baad bhi navigate ho jayega
+     
       throw error;
     } finally {
       dispatch(setLoading(false));
