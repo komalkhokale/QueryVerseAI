@@ -49,6 +49,14 @@ const Register = () => {
         return "Please enter your username";
       }
 
+      if (trimmedValue.length < 3) {
+        return "Username must be at least 3 characters";
+      }
+
+      if (!/^[a-zA-Z0-9._]+$/.test(trimmedValue)) {
+        return "Username can only contain letters, numbers, dots and underscores";
+      }
+
       return "";
     }
 
@@ -69,6 +77,10 @@ const Register = () => {
     if (name === "password") {
       if (!value) {
         return "Please create a password";
+      }
+
+      if (value.length < 6) {
+        return "Password must be at least 6 characters";
       }
 
       return "";
@@ -145,8 +157,47 @@ const Register = () => {
     } catch (error) {
       toast.dismiss(loadingToast);
 
+      const responseData = error?.response?.data;
+
+      console.log("Register error:", responseData || error);
+
+      // Backend express-validator field errors
+      if (
+        Array.isArray(responseData?.errors) &&
+        responseData.errors.length > 0
+      ) {
+        const backendErrors = {
+          username: "",
+          email: "",
+          password: "",
+          general: "",
+        };
+
+        responseData.errors.forEach((item) => {
+          const fieldName = item?.path || item?.param;
+          const errorMessage = item?.msg || "Invalid value";
+
+          if (
+            fieldName === "username" ||
+            fieldName === "email" ||
+            fieldName === "password"
+          ) {
+            backendErrors[fieldName] = errorMessage;
+          } else {
+            backendErrors.general = errorMessage;
+          }
+        });
+
+        setErrors((previous) => ({
+          ...previous,
+          ...backendErrors,
+        }));
+
+        return;
+      }
+
       const message =
-        error?.response?.data?.message ||
+        responseData?.message ||
         error?.message ||
         "Registration failed. Please try again.";
 
@@ -156,11 +207,13 @@ const Register = () => {
         lowerMessage.includes("email") &&
         (lowerMessage.includes("exist") ||
           lowerMessage.includes("registered") ||
-          lowerMessage.includes("duplicate"))
+          lowerMessage.includes("duplicate") ||
+          lowerMessage.includes("used"))
       ) {
         setErrors((previous) => ({
           ...previous,
           email: message,
+          general: "",
         }));
 
         return;
@@ -170,11 +223,28 @@ const Register = () => {
         lowerMessage.includes("username") &&
         (lowerMessage.includes("exist") ||
           lowerMessage.includes("taken") ||
-          lowerMessage.includes("duplicate"))
+          lowerMessage.includes("duplicate") ||
+          lowerMessage.includes("used") ||
+          lowerMessage.includes("contain") ||
+          lowerMessage.includes("character"))
       ) {
         setErrors((previous) => ({
           ...previous,
           username: message,
+          general: "",
+        }));
+
+        return;
+      }
+
+      if (
+        lowerMessage.includes("password") ||
+        lowerMessage.includes("characters")
+      ) {
+        setErrors((previous) => ({
+          ...previous,
+          password: message,
+          general: "",
         }));
 
         return;
@@ -269,10 +339,10 @@ const Register = () => {
             {errors.username && (
               <p
                 id="username-error"
-                className="mt-2 flex items-center gap-1.5 text-xs text-red-400"
+                className="mt-2 flex items-start gap-1.5 text-xs leading-5 text-red-400"
               >
-                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                {errors.username}
+                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span>{errors.username}</span>
               </p>
             )}
           </div>
@@ -302,10 +372,10 @@ const Register = () => {
             {errors.email && (
               <p
                 id="email-error"
-                className="mt-2 flex items-center gap-1.5 text-xs text-red-400"
+                className="mt-2 flex items-start gap-1.5 text-xs leading-5 text-red-400"
               >
-                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                {errors.email}
+                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span>{errors.email}</span>
               </p>
             )}
           </div>
@@ -352,10 +422,10 @@ const Register = () => {
             {errors.password && (
               <p
                 id="password-error"
-                className="mt-2 flex items-center gap-1.5 text-xs text-red-400"
+                className="mt-2 flex items-start gap-1.5 text-xs leading-5 text-red-400"
               >
-                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                {errors.password}
+                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span>{errors.password}</span>
               </p>
             )}
           </div>
