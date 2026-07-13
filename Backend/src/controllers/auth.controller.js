@@ -1,6 +1,6 @@
 import userModel from "../models/user.model.js";
 import jwt from "jsonwebtoken";
-import { sendEmail } from "../services/mail.service.js";
+// import { sendEmail } from "../services/mail.service.js";
 
 /**
  * @desc Register a new user
@@ -8,9 +8,162 @@ import { sendEmail } from "../services/mail.service.js";
  * @access Public
  * @body { username, email, password }
  */
+// export async function register(req, res) {
+//   let user = null;
+
+//   try {
+//     const username = req.body.username?.trim();
+//     const email = req.body.email?.trim().toLowerCase();
+//     const password = req.body.password;
+
+//     const isUserAlreadyExists = await userModel.findOne({
+//       $or: [{ email }, { username }],
+//     });
+
+//     if (isUserAlreadyExists) {
+//       return res.status(400).json({
+//         message: "User with this email or username already exists",
+//         success: false,
+//         err: "User already exists",
+//       });
+//     }
+
+//     user = await userModel.create({
+//       username,
+//       email,
+//       password,
+//     });
+
+//     const emailVerificationToken = jwt.sign(
+//       {
+//         email: user.email,
+//       },
+//       process.env.JWT_SECRET,
+//       {
+//         expiresIn: "30m",
+//       },
+//     );
+
+//     const verificationLink =
+//       `https://queryverseai.onrender.com/api/auth/verify-email?token=` +
+//       encodeURIComponent(emailVerificationToken);
+
+//     try {
+//       await sendEmail({
+//         to: user.email,
+//         subject: "Verify your QueryVerseAI account",
+
+//         text: `Hi ${username}, verify your email using this link: ${verificationLink}`,
+
+//         html: `
+//           <div
+//             style="
+//               max-width: 520px;
+//               margin: 30px auto;
+//               padding: 32px;
+//               background: #18181b;
+//               color: #ffffff;
+//               border-radius: 18px;
+//               font-family: Arial, sans-serif;
+//             "
+//           >
+//             <p
+//               style="
+//                 color: #a78bfa;
+//                 font-size: 13px;
+//                 font-weight: bold;
+//                 letter-spacing: 2px;
+//                 text-transform: uppercase;
+//               "
+//             >
+//               QueryVerseAI
+//             </p>
+
+//             <h1 style="margin-bottom: 20px;">
+//               Verify your email
+//             </h1>
+
+//             <p style="color: #d4d4d8;">
+//               Hi ${username},
+//             </p>
+
+//             <p
+//               style="
+//                 color: #a1a1aa;
+//                 line-height: 1.7;
+//               "
+//             >
+//               Thank you for registering at QueryVerseAI.
+//               Click the button below to verify your email address.
+//             </p>
+
+//             <a
+//               href="${verificationLink}"
+//               style="
+//                 display: inline-block;
+//                 margin-top: 18px;
+//                 padding: 14px 24px;
+//                 border-radius: 12px;
+//                 background: #7c3aed;
+//                 color: #ffffff;
+//                 font-weight: bold;
+//                 text-decoration: none;
+//               "
+//             >
+//               Verify Email
+//             </a>
+
+//             <p
+//               style="
+//                 margin-top: 26px;
+//                 color: #71717a;
+//                 font-size: 13px;
+//                 line-height: 1.6;
+//               "
+//             >
+//               This link will expire in 30 minutes.
+//               If you did not create this account, ignore this email.
+//             </p>
+//           </div>
+//         `,
+//       });
+//     } catch (emailError) {
+//       // Mail nahi gaya to incomplete user DB se delete hoga
+//       await userModel.findByIdAndDelete(user._id);
+
+//       return res.status(500).json({
+//         message: "Verification email send nahi hua. Please try again.",
+//         success: false,
+//         err: emailError.message,
+//       });
+//     }
+
+//     return res.status(201).json({
+//       message:
+//         "User registered successfully. Please check your email and verify your account.",
+//       success: true,
+//     });
+//   } catch (error) {
+//     console.error("Register error:", error);
+
+//     if (user?._id) {
+//       await userModel.findByIdAndDelete(user._id).catch(() => {});
+//     }
+
+//     return res.status(500).json({
+//       message: "Registration failed. Please try again.",
+//       success: false,
+//       err: error.message,
+//     });
+//   }
+// }
+
+
 export async function register(req, res) {
   try {
-    const { username, email, password } = req.body;
+    const username = req.body.username?.trim();
+    const email = req.body.email?.trim().toLowerCase();
+    const password = req.body.password;
 
     const isUserAlreadyExists = await userModel.findOne({
       $or: [{ email }, { username }],
@@ -20,61 +173,18 @@ export async function register(req, res) {
       return res.status(400).json({
         message: "User with this email or username already exists",
         success: false,
-        err: "User already exists",
       });
     }
 
-    const user = await userModel.create({
+    await userModel.create({
       username,
       email,
       password,
+      verified: true,
     });
 
-    const emailVerificationToken = jwt.sign(
-      {
-        email: user.email,
-      },
-      process.env.JWT_SECRET,
-    );
-
-    await sendEmail({
-      to: email,
-      subject: "Welcome to QueryVerseAI!",
-      html: `
-        <p>Hi ${username},</p>
-
-        <p>
-          Thank you for registering at
-          <strong>QueryVerseAI</strong>.
-          We're excited to have you on board!
-        </p>
-
-        <p>
-          Please verify your email address by clicking the link below:
-        </p>
-
-        <a
-          href="https://queryverseai.onrender.com/api/auth/verify-email?token=${emailVerificationToken}"
-        >
-          Verify Email
-        </a>
-
-        <p>
-          If you did not create an account, please ignore this email.
-        </p>
-
-        <p>
-          Best regards,
-          <br />
-          The QueryVerseAI Team
-        </p>
-      `,
-    });
-
-  
     return res.status(201).json({
-      message:
-        "User registered successfully. Please verify your email before logging in.",
+      message: "Account created successfully. Please login.",
       success: true,
     });
   } catch (error) {
@@ -118,13 +228,6 @@ export async function login(req, res) {
       });
     }
 
-    if (!user.verified) {
-      return res.status(400).json({
-        message: "Please verify your email before logging in",
-        success: false,
-        err: "Email not verified",
-      });
-    }
 
     const token = jwt.sign(
       {
