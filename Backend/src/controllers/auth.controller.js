@@ -9,12 +9,8 @@ import { sendEmail } from "../services/mail.service.js";
  * @body { username, email, password }
  */
 export async function register(req, res) {
-  let createdUser = null;
-
   try {
-    const username = req.body.username?.trim();
-    const email = req.body.email?.trim().toLowerCase();
-    const password = req.body.password;
+    const { username, email, password } = req.body;
 
     const isUserAlreadyExists = await userModel.findOne({
       $or: [{ email }, { username }],
@@ -28,7 +24,7 @@ export async function register(req, res) {
       });
     }
 
-    createdUser = await userModel.create({
+    const user = await userModel.create({
       username,
       email,
       password,
@@ -36,121 +32,53 @@ export async function register(req, res) {
 
     const emailVerificationToken = jwt.sign(
       {
-        email: createdUser.email,
+        email: user.email,
       },
       process.env.JWT_SECRET,
-      {
-        expiresIn: "30m",
-      },
     );
 
-    const verificationUrl = `https://queryverseai.onrender.com/api/auth/verify-email?token=${emailVerificationToken}`;
+    await sendEmail({
+      to: email,
+      subject: "Welcome to QueryVerseAI!",
+      html: `
+        <p>Hi ${username},</p>
 
-    try {
-      await sendEmail({
-        to: createdUser.email,
-        subject: "Verify your QueryVerseAI account",
-        text: `Hi ${username}, verify your email using this link: ${verificationUrl}`,
-        html: `
-          <div
-            style="
-              max-width: 520px;
-              margin: 30px auto;
-              padding: 32px;
-              background: #18181b;
-              color: #ffffff;
-              border-radius: 18px;
-              font-family: Arial, sans-serif;
-            "
-          >
-            <p
-              style="
-                color: #a78bfa;
-                font-size: 13px;
-                font-weight: bold;
-                letter-spacing: 2px;
-                text-transform: uppercase;
-              "
-            >
-              QueryVerseAI
-            </p>
+        <p>
+          Thank you for registering at
+          <strong>QueryVerseAI</strong>.
+          We're excited to have you on board!
+        </p>
 
-            <h1 style="margin-bottom: 20px;">
-              Verify your email
-            </h1>
+        <p>
+          Please verify your email address by clicking the link below:
+        </p>
 
-            <p style="color: #d4d4d8;">
-              Hi ${username},
-            </p>
+        <a
+          href="https://queryverseai.onrender.com/api/auth/verify-email?token=${emailVerificationToken}"
+        >
+          Verify Email
+        </a>
 
-            <p
-              style="
-                color: #a1a1aa;
-                line-height: 1.7;
-              "
-            >
-              Thank you for registering at QueryVerseAI.
-              Click the button below to verify your email address.
-            </p>
+        <p>
+          If you did not create an account, please ignore this email.
+        </p>
 
-            <a
-              href="${verificationUrl}"
-              style="
-                display: inline-block;
-                margin-top: 18px;
-                padding: 14px 24px;
-                border-radius: 12px;
-                background: #7c3aed;
-                color: #ffffff;
-                font-weight: bold;
-                text-decoration: none;
-              "
-            >
-              Verify Email
-            </a>
+        <p>
+          Best regards,
+          <br />
+          The QueryVerseAI Team
+        </p>
+      `,
+    });
 
-            <p
-              style="
-                margin-top: 26px;
-                color: #71717a;
-                font-size: 13px;
-                line-height: 1.6;
-              "
-            >
-              This link will expire in 30 minutes.
-              If you did not create this account, ignore this email.
-            </p>
-          </div>
-        `,
-      });
-    } catch (emailError) {
-      // Mail fail hua to user database se remove hoga
-      await userModel.findByIdAndDelete(createdUser._id);
-
-      console.error("Email sending error:", emailError);
-
-      return res.status(500).json({
-        message:
-          "Verification email send nahi hua. Please try again.",
-        success: false,
-        err: emailError.message,
-      });
-    }
-
+  
     return res.status(201).json({
       message:
-        "User registered successfully. Please check your email and verify your account.",
+        "User registered successfully. Please verify your email before logging in.",
       success: true,
     });
   } catch (error) {
     console.error("Register error:", error);
-
-    // Mail ke alawa kisi aur stage par error hua ho
-    if (createdUser?._id) {
-      await userModel
-        .findByIdAndDelete(createdUser._id)
-        .catch(() => {});
-    }
 
     return res.status(500).json({
       message: "Registration failed. Please try again.",
