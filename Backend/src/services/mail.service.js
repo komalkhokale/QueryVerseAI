@@ -64,7 +64,6 @@
 //     }
 //   }
 
-
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -83,20 +82,22 @@ oauth2Client.setCredentials({
 
 export async function sendEmail({ to, subject, html, text }) {
   try {
-    const accessTokenResponse = await oauth2Client.getAccessToken();
+    console.log("MAIL 1: Getting access token");
+
+    const accessTokenResponse =
+      await oauth2Client.getAccessToken();
+
+    console.log("MAIL 2: Access token received");
 
     const accessToken =
       typeof accessTokenResponse === "string"
         ? accessTokenResponse
         : accessTokenResponse?.token;
 
-    if (!accessToken) {
-      throw new Error("Unable to generate Gmail access token");
-    }
+    console.log("MAIL 3: Creating transporter");
 
     const transporter = nodemailer.createTransport({
       service: "gmail",
-
       auth: {
         type: "OAuth2",
         user: process.env.GOOGLE_USER,
@@ -105,22 +106,26 @@ export async function sendEmail({ to, subject, html, text }) {
         refreshToken: process.env.GOOGLE_REFRESH_TOKEN,
         accessToken,
       },
+      connectionTimeout: 15000,
+      greetingTimeout: 15000,
+      socketTimeout: 20000,
     });
+
+    console.log("MAIL 4: Calling sendMail");
 
     const details = await transporter.sendMail({
       from: `"QueryVerseAI" <${process.env.GOOGLE_USER}>`,
       to,
       subject,
-      text,
       html,
+      text,
     });
 
-    console.log("Email sent successfully:", details.messageId);
+    console.log("MAIL 5: Email sent:", details.messageId);
 
     return details;
   } catch (error) {
-    console.error("Email sending failed:", error.message);
-
+    console.error("MAIL ERROR:", error);
     throw error;
   }
 }
